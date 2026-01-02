@@ -30,6 +30,6 @@ setup(
     ],
     python_requires=">=3.7",
     install_requires=[
-        # 无外部依赖，这是一个纯Python库
+        'requests>=2.25.0',
     ],
 )

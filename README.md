@@ -20,6 +20,83 @@
 
 ---
 
+## 🤖 AI增强功能
+
+`chenmo` 现在支持AI增强内容生成，通过API调用AI服务来生成更丰富、更详细的内容。
+
+### AI增强标识
+
+在参数前加上 `AI:` 前缀即可启用AI增强功能：
+
+- `log_works="AI:一个赛博朋克风格的未来都市..."` - AI生成世界设定
+- `log_person=["AI:一个黑客，拥有神经接口..."]` - AI生成人物信息
+- `log_settings=["AI:这个世界的物理法则..."]` - AI生成设定细节
+- `log_thing=["AI:神经接口设备..."]` - AI生成物品/科技描述
+- `axioms=["AI:信息即物质..."]` - AI生成公理
+- `traits=["AI:技术天赋异禀..."]` - AI生成特质
+- `then="AI:AI实体决定帮助黑客..."` - AI生成情节事件
+
+### 配置AI服务
+
+`chenmo` 提供了两种配置AI服务的方式：
+
+#### 方式1：环境变量配置
+
+```bash
+export CHENMO_API_KEY="your-api-key-here"
+export CHENMO_API_URL="https://api.openai.com/v1/chat/completions"  # 可选，默认值
+export CHENMO_MODEL="gpt-3.5-turbo"  # 可选，默认值
+```
+
+#### 方式2：首次使用时的交互配置
+
+首次运行 `chenmo` 时，如果未设置环境变量且配置文件不存在，系统会提示您输入API配置信息：
+
+```
+欢迎使用 chenmo 可编程元叙事引擎！
+首次使用需要配置AI服务信息：
+请输入API URL (例如: https://api.openai.com/v1/chat/completions): 
+请输入API Key: 
+请输入模型名称 (例如: gpt-4, gpt-3.5-turbo): 
+配置已保存到 /home/username/.chenmo/config.json
+```
+
+配置信息将保存在 `~/.chenmo/config.json` 文件中，后续使用无需重复配置。
+
+### AI增强示例
+
+```python
+from chenmo import l, r, i
+
+# 使用AI生成作品和人物
+l.cyberpunk.novies(
+    log_works="AI:一个赛博朋克风格的未来都市， corporations控制一切，网络黑客是反抗的希望",
+    log_person=["AI:一个顶尖的网络黑客，因为一次失败的神经植入手术而身体残疾", "AI:一个前公司特工，现在成为了黑市军火商"]
+)
+
+# 使用AI生成内核设定
+c.cyberpunk.tech(
+    axioms=["AI:神经接口技术使得意识可以上传和下载", "AI:AI监控系统控制着城市的所有摄像头和传感器"],
+    constraints=["AI:未经许可的神经植入手术是非法的"]
+)
+
+# 使用AI生成人物特质
+p.cyberpunk.hacker(
+    traits=["AI:擅长网络渗透", "AI:对AI系统有独特的直觉", "AI:身体经过机械改造"],
+    constraints=["AI:不能信任任何公司", "AI:必须保护自己的真实身份"]
+)
+
+# 在推演中使用AI生成情节事件
+r.cyberpunk.hacker(
+    when=i.cyberpunk.hacker(target='p').status == "cornered",
+    then="AI:黑客利用城市的AI监控系统制造混乱并成功逃脱",
+    outcome={
+        "hacker.location": "safe_house",
+        "corporation.alert_level": "high"
+    }
+)
+```
+
 ## 📜 完整语句语法规范（全覆盖）
 
 所有语句遵循统一结构：  
