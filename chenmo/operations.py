@@ -131,7 +131,6 @@ class OperationManager:
                 "version": "1.0",
                 "canonical_source": "local_creation"
             }
-            import json
             with open(work_path / 'manifest.json', 'w', encoding='utf-8') as f:
                 json.dump(manifest, f, ensure_ascii=False, indent=2)
         
