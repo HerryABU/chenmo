@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
 from .utils import get_work_path, is_temp_work, validate_namespace, get_storage_path, ensure_work_directories
 from .storage import StorageManager
+from .api import get_api_client
 
 
 class OperationManager:
@@ -134,41 +135,140 @@ class OperationManager:
             with open(work_path / 'manifest.json', 'w', encoding='utf-8') as f:
                 json.dump(manifest, f, ensure_ascii=False, indent=2)
         
-        # 注册作品描述（如果sub_name是novies）
+        # 如果log_works是None或空字符串，尝试使用AI生成
         if sub_name == 'novies' and log_works:
-            novies_data = {
-                "type": "novies",
-                "description": log_works,
-                "registered_at": str(Path.home() / '.chenmo')
-            }
+            # 检查是否包含AI增强指令（以"AI:"开头）
+            ai_enhanced = log_works.startswith("AI:")
+            if ai_enhanced:
+                ai_description = log_works[3:].strip()  # 移除"AI:"前缀
+                api_client = get_api_client()
+                enhanced_data = api_client.generate_world_setting(ai_description)
+                if enhanced_data:
+                    novies_data = {
+                        "type": "novies",
+                        "description": ai_description,
+                        "ai_enhanced": True,
+                        "enhanced_data": enhanced_data,
+                        "registered_at": str(Path.home() / '.chenmo')
+                    }
+                else:
+                    # 如果AI生成失败，使用原始描述
+                    novies_data = {
+                        "type": "novies",
+                        "description": ai_description,
+                        "ai_enhanced": False,
+                        "registered_at": str(Path.home() / '.chenmo')
+                    }
+            else:
+                novies_data = {
+                    "type": "novies",
+                    "description": log_works,
+                    "ai_enhanced": False,
+                    "registered_at": str(Path.home() / '.chenmo')
+                }
+            
             with open(work_path / 'novies' / f'{sub_name}.json', 'w', encoding='utf-8') as f:
                 json.dump(novies_data, f, ensure_ascii=False, indent=2)
         
-        # 注册人物
+        # 注册人物 - 尝试AI增强
         for person_name in log_person:
-            person_data = {
-                "type": "persona",
-                "name": person_name,
-                "registered_from": f"{work_name}.{sub_name}"
-            }
-            with open(work_path / 'personas' / f'{person_name}.json', 'w', encoding='utf-8') as f:
+            ai_enhanced = person_name.startswith("AI:")
+            if ai_enhanced:
+                ai_description = person_name[3:].strip()
+                api_client = get_api_client()
+                enhanced_data = api_client.generate_character(ai_description)
+                if enhanced_data:
+                    person_data = {
+                        "type": "persona",
+                        "name": enhanced_data.get("name", ai_description),
+                        "ai_enhanced": True,
+                        "enhanced_data": enhanced_data,
+                        "registered_from": f"{work_name}.{sub_name}"
+                    }
+                else:
+                    # 如果AI生成失败，使用原始名称
+                    person_data = {
+                        "type": "persona",
+                        "name": ai_description,
+                        "ai_enhanced": False,
+                        "registered_from": f"{work_name}.{sub_name}"
+                    }
+            else:
+                person_data = {
+                    "type": "persona",
+                    "name": person_name,
+                    "ai_enhanced": False,
+                    "registered_from": f"{work_name}.{sub_name}"
+                }
+            
+            with open(work_path / 'personas' / f'{person_name.split()[0] if " " in person_name else person_name}.json', 'w', encoding='utf-8') as f:
                 json.dump(person_data, f, ensure_ascii=False, indent=2)
         
-        # 注册设定
+        # 注册设定 - 尝试AI增强
         if log_settings:
+            processed_settings = []
+            for setting in log_settings:
+                ai_enhanced = setting.startswith("AI:")
+                if ai_enhanced:
+                    ai_description = setting[3:].strip()
+                    api_client = get_api_client()
+                    enhanced_data = api_client.generate_world_setting(ai_description)
+                    if enhanced_data:
+                        processed_settings.append({
+                            "original": ai_description,
+                            "ai_enhanced": True,
+                            "enhanced_data": enhanced_data
+                        })
+                    else:
+                        processed_settings.append({
+                            "original": ai_description,
+                            "ai_enhanced": False
+                        })
+                else:
+                    processed_settings.append({
+                        "original": setting,
+                        "ai_enhanced": False
+                    })
+            
             settings_data = {
                 "type": "core",
-                "settings": log_settings,
+                "settings": processed_settings,
                 "registered_from": f"{work_name}.{sub_name}"
             }
             with open(work_path / 'cores' / f'{sub_name}_settings.json', 'w', encoding='utf-8') as f:
                 json.dump(settings_data, f, ensure_ascii=False, indent=2)
         
-        # 注册物品/科技
+        # 注册物品/科技 - 尝试AI增强
         if log_thing:
+            processed_things = []
+            for thing in log_thing:
+                ai_enhanced = thing.startswith("AI:")
+                if ai_enhanced:
+                    ai_description = thing[3:].strip()
+                    api_client = get_api_client()
+                    # 使用通用生成方法来处理物品/科技
+                    prompt = f"基于以下描述生成详细的科技/物品信息：{ai_description}"
+                    enhanced_description = api_client.generate_content(prompt)
+                    if enhanced_description:
+                        processed_things.append({
+                            "original": ai_description,
+                            "ai_enhanced": True,
+                            "enhanced_description": enhanced_description
+                        })
+                    else:
+                        processed_things.append({
+                            "original": ai_description,
+                            "ai_enhanced": False
+                        })
+                else:
+                    processed_things.append({
+                        "original": thing,
+                        "ai_enhanced": False
+                    })
+            
             thing_data = {
                 "type": "tech",
-                "items": log_thing,
+                "items": processed_things,
                 "registered_from": f"{work_name}.{sub_name}"
             }
             with open(work_path / 'tech' / f'{sub_name}_tech.json', 'w', encoding='utf-8') as f:
@@ -264,12 +364,64 @@ class OperationManager:
         # 确保目录存在
         ensure_work_directories(work_path)
         
+        # 检查是否需要AI增强（axioms或constraints中包含"AI:"前缀）
+        ai_enhanced_axioms = [a for a in axioms if a.startswith("AI:")]
+        ai_enhanced_constraints = [c for c in constraints if c.startswith("AI:")]
+        
+        processed_axioms = []
+        processed_constraints = []
+        
+        # 处理AI增强的公理
+        for axiom in axioms:
+            if axiom.startswith("AI:"):
+                ai_description = axiom[3:].strip()
+                api_client = get_api_client()
+                enhanced_data = api_client.generate_world_setting(ai_description)
+                if enhanced_data:
+                    processed_axioms.append({
+                        "original": ai_description,
+                        "ai_enhanced": True,
+                        "enhanced_data": enhanced_data,
+                        "axiom_type": "generated"
+                    })
+                else:
+                    processed_axioms.append({
+                        "original": ai_description,
+                        "ai_enhanced": False,
+                        "axiom_type": "fallback"
+                    })
+            else:
+                processed_axioms.append(axiom)
+        
+        # 处理AI增强的约束
+        for constraint in constraints:
+            if constraint.startswith("AI:"):
+                ai_description = constraint[3:].strip()
+                api_client = get_api_client()
+                enhanced_data = api_client.generate_world_setting(ai_description)
+                if enhanced_data:
+                    processed_constraints.append({
+                        "original": ai_description,
+                        "ai_enhanced": True,
+                        "enhanced_data": enhanced_data,
+                        "constraint_type": "generated"
+                    })
+                else:
+                    processed_constraints.append({
+                        "original": ai_description,
+                        "ai_enhanced": False,
+                        "constraint_type": "fallback"
+                    })
+            else:
+                processed_constraints.append(constraint)
+        
         # 创建内核数据
         core_data = {
             "type": "core",
-            "axioms": axioms,
-            "constraints": constraints,
-            "extracted_from": f"{work_name}.{sub_name}"
+            "axioms": processed_axioms,
+            "constraints": processed_constraints,
+            "extracted_from": f"{work_name}.{sub_name}",
+            "ai_enhanced": bool(ai_enhanced_axioms or ai_enhanced_constraints)
         }
         
         # 保存内核数据
@@ -291,12 +443,64 @@ class OperationManager:
         # 确保目录存在
         ensure_work_directories(work_path)
         
+        # 检查是否需要AI增强（traits或constraints中包含"AI:"前缀）
+        ai_enhanced_traits = [t for t in traits if t.startswith("AI:")]
+        ai_enhanced_constraints = [c for c in constraints if c.startswith("AI:")]
+        
+        processed_traits = []
+        processed_constraints = []
+        
+        # 处理AI增强的特质
+        for trait in traits:
+            if trait.startswith("AI:"):
+                ai_description = trait[3:].strip()
+                api_client = get_api_client()
+                enhanced_data = api_client.generate_character(ai_description)
+                if enhanced_data:
+                    processed_traits.append({
+                        "original": ai_description,
+                        "ai_enhanced": True,
+                        "enhanced_data": enhanced_data,
+                        "trait_type": "generated"
+                    })
+                else:
+                    processed_traits.append({
+                        "original": ai_description,
+                        "ai_enhanced": False,
+                        "trait_type": "fallback"
+                    })
+            else:
+                processed_traits.append(trait)
+        
+        # 处理AI增强的约束
+        for constraint in constraints:
+            if constraint.startswith("AI:"):
+                ai_description = constraint[3:].strip()
+                api_client = get_api_client()
+                enhanced_data = api_client.generate_character(ai_description)
+                if enhanced_data:
+                    processed_constraints.append({
+                        "original": ai_description,
+                        "ai_enhanced": True,
+                        "enhanced_data": enhanced_data,
+                        "constraint_type": "generated"
+                    })
+                else:
+                    processed_constraints.append({
+                        "original": ai_description,
+                        "ai_enhanced": False,
+                        "constraint_type": "fallback"
+                    })
+            else:
+                processed_constraints.append(constraint)
+        
         # 创建人物数据
         persona_data = {
             "type": "persona",
-            "traits": traits,
-            "constraints": constraints,
-            "extracted_from": f"{work_name}.{sub_name}"
+            "traits": processed_traits,
+            "constraints": processed_constraints,
+            "extracted_from": f"{work_name}.{sub_name}",
+            "ai_enhanced": bool(ai_enhanced_traits or ai_enhanced_constraints)
         }
         
         # 保存人物数据
@@ -385,18 +589,50 @@ class OperationManager:
         if not work_path.exists():
             raise ValueError(f"Work does not exist: {work_name}")
         
-        # 验证所有引用都在同一作品内（这里简化处理）
-        # 实际实现中需要解析when表达式并验证引用
-        
-        # 创建推演结果数据
-        run_data = {
-            "type": "run",
-            "when_condition": str(when) if when else "always",
-            "then_event": then,
-            "outcome": outcome,
-            "executed_in": f"{work_name}.{sub_name}",
-            "executed_at": str(Path.home() / '.chenmo')
-        }
+        # 检查是否需要AI增强（then以"AI:"开头）
+        ai_enhanced = then.startswith("AI:")
+        if ai_enhanced:
+            ai_context = then[3:].strip()  # 移除"AI:"前缀
+            api_client = get_api_client()
+            
+            # 获取作品上下文
+            context_info = self._get_work_context(work_name, sub_name)
+            
+            # 生成情节事件
+            enhanced_event = api_client.generate_plot_event(context_info, ai_context)
+            if enhanced_event:
+                run_data = {
+                    "type": "run",
+                    "when_condition": str(when) if when else "always",
+                    "then_event": ai_context,
+                    "ai_enhanced": True,
+                    "enhanced_event": enhanced_event,
+                    "outcome": outcome,
+                    "executed_in": f"{work_name}.{sub_name}",
+                    "executed_at": str(Path.home() / '.chenmo')
+                }
+            else:
+                # 如果AI生成失败，使用原始事件
+                run_data = {
+                    "type": "run",
+                    "when_condition": str(when) if when else "always",
+                    "then_event": ai_context,
+                    "ai_enhanced": False,
+                    "outcome": outcome,
+                    "executed_in": f"{work_name}.{sub_name}",
+                    "executed_at": str(Path.home() / '.chenmo')
+                }
+        else:
+            # 非AI增强模式
+            run_data = {
+                "type": "run",
+                "when_condition": str(when) if when else "always",
+                "then_event": then,
+                "ai_enhanced": False,
+                "outcome": outcome,
+                "executed_in": f"{work_name}.{sub_name}",
+                "executed_at": str(Path.home() / '.chenmo')
+            }
         
         # 确保目录存在
         ensure_work_directories(work_path)
@@ -408,6 +644,46 @@ class OperationManager:
             json.dump(run_data, f, ensure_ascii=False, indent=2)
         
         return f"Successfully ran scenario {then} in {work_name}.{sub_name}"
+    
+    def _get_work_context(self, work_name: str, sub_name: str) -> str:
+        """
+        获取作品上下文信息，用于AI生成
+        """
+        work_path = get_work_path(work_name)
+        context_parts = []
+        
+        # 添加作品描述（如果存在）
+        novies_path = work_path / 'novies' / f'{sub_name}.json'
+        if novies_path.exists():
+            with open(novies_path, 'r', encoding='utf-8') as f:
+                import json
+                novies_data = json.load(f)
+                if 'description' in novies_data:
+                    context_parts.append(f"作品描述: {novies_data['description']}")
+                if 'enhanced_data' in novies_data:
+                    context_parts.append(f"AI增强数据: {novies_data['enhanced_data']}")
+        
+        # 添加人物信息（如果存在）
+        personas_dir = work_path / 'personas'
+        if personas_dir.exists():
+            for persona_file in personas_dir.glob('*.json'):
+                with open(persona_file, 'r', encoding='utf-8') as f:
+                    persona_data = json.load(f)
+                    if 'name' in persona_data:
+                        context_parts.append(f"人物: {persona_data['name']}")
+        
+        # 添加内核信息（如果存在）
+        cores_dir = work_path / 'cores'
+        if cores_dir.exists():
+            for core_file in cores_dir.glob('*.json'):
+                with open(core_file, 'r', encoding='utf-8') as f:
+                    core_data = json.load(f)
+                    if 'axioms' in core_data:
+                        context_parts.append(f"公理: {core_data['axioms']}")
+                    if 'constraints' in core_data:
+                        context_parts.append(f"约束: {core_data['constraints']}")
+        
+        return " | ".join(context_parts) if context_parts else f"作品: {work_name}, 子模块: {sub_name}"
     
     def inspect(self, work_name: str, sub_name: str, target: str):
         """
